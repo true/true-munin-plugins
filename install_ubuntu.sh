@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex
+set -e
 
 DIR_PLUGINS_USED="/etc/munin/plugins"
 
