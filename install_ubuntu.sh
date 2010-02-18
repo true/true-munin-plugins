@@ -1,47 +1,66 @@
 #!/bin/bash
-set -x
+set -e
 
-function getdirs() {
-    wget -qO- "http://github.com/true/true-munin-plugins${1}?raw=true" |html2text |egrep '/$' |egrep -v '^_' |sed 's#[^a-z0-9A-Z_]##g'
-}
+DIR_PLUGINS_USED="/tmp/etc/munin/plugins"
 
-apt-get -fym install html2text dialog
+olddir=$(pwd)
 
+# prerequisites
+apt-get -fym install html2text dialog git-core
+
+# clone / pull gitrep
+[ -d /var/git ] || mkdir -p /var/git
+cd /var/git
+if [ -d true-munin-plugins/.git ]; then
+    cd true-munin-plugins
+    git pull
+else
+    git clone git://github.com/true/true-munin-plugins.git && cd true-munin-plugins
+    cd true-munin-plugins
+fi
+
+# Index Dirs & prepare checklist
 list=""
-for dir in $(getdirs '/'); do
+for dir in $(find -maxdepth 1 -type d |sed 's#\./##g' |egrep -v '(^_|^\.)' |sort); do
     status="on"
     if [ "${dir}" = "libvirt" ]; then
-        status="off"
+        status="on"
     fi
 
     list="${list} ${dir} ${dir} ${status}"
 done
 
+# Show checklist and save wanted plugins
 dialog --checklist "Which plugins do you want to install?" 20 40 10 ${list}  2> /tmp/answer$$
 plugins=$(cat /tmp/answer$$)
 
+mkdir -p ${DIR_PLUGINS_USED}
+
 for plugin in ${plugins}; do
-    echo $plugin;
-    # /usr/share/munin/plugins/
+    plugin=$(echo "${plugin}" |sed 's#"##g')
+    cd ${plugin}
 
+    echo "Installing Plugin: ${plugin}";
 
+    if [ -f install.sh ]; then
+        echo "  Found ${plugin}/install.sh, executing.."
+        bash install.sh
+    else
+        echo "  There was no ${plugin}/install.sh, so just symlinking all files to ${DIR_PLUGINS_USED})"
+        for plugfile in $(find ./ -maxdepth 1 -type f |egrep -v '(^\./_|^\./\.)' |sed "s#\./#$(pwd)/#g"); do
+            plugbase=$(basename "${plugfile}")
+            ln -nfs ${plugfile} ${DIR_PLUGINS_USED}/${plugbase}
+        done
+    fi
+    echo ""
+    
+    cd - > /dev/null
 done
 
+if [ -x /etc/init.d/munin-node ]; then
+    echo "Restarting munin-node... "
+    /etc/init.d/munin-node restart
+fi
 
-
-plugins=( libvirt-blkstat libvirt-cputime libvirt-ifstat libvirt-mem libvirt__cputime libvirt__ifstat libvirt__mem libvirt__blkstat apt_ubuntu )
-
-
-
-exit 1
-
-plugins_lib=/usr/share/munin/plugins/
-plugins_live=/etc/munin/plugins/
-
-cd $plugins_lib
-for plugin in ${plugins[@]}
-do
- wget http://hulk.true.nl/$plugin -O $plugins_lib/$plugin
- ln -s $plugins_lib/$plugin $plugins_live
-done
-ln -s $plugins_lib/nfs_client $plugins_live 
+# return to working dir
+cd ${olddir}
