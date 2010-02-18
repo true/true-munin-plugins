@@ -1,7 +1,7 @@
 #!/bin/bash
-set -e
+set -ex
 
-DIR_PLUGINS_USED="/tmp/etc/munin/plugins"
+DIR_PLUGINS_USED="/etc/munin/plugins"
 
 olddir=$(pwd)
 
@@ -24,7 +24,7 @@ list=""
 for dir in $(find -maxdepth 1 -type d |sed 's#\./##g' |egrep -v '(^_|^\.)' |sort); do
     status="on"
     if [ "${dir}" = "libvirt" ]; then
-        status="on"
+        status="off"
     fi
 
     list="${list} ${dir} ${dir} ${status}"
@@ -42,9 +42,9 @@ for plugin in ${plugins}; do
 
     echo "Installing Plugin: ${plugin}";
 
-    if [ -f install.sh ]; then
+    if [ -f "install.sh" ]; then
         echo "  Found ${plugin}/install.sh, executing.."
-        bash install.sh
+        source install.sh
     else
         echo "  There was no ${plugin}/install.sh, so just symlinking all files to ${DIR_PLUGINS_USED})"
         for plugfile in $(find ./ -maxdepth 1 -type f |egrep -v '(^\./_|^\./\.)' |sed "s#\./#$(pwd)/#g"); do
