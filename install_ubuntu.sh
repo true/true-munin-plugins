@@ -1,4 +1,8 @@
 #!/bin/bash
+
+
+
+
 plugins=( libvirt-blkstat libvirt-cputime libvirt-ifstat libvirt-mem libvirt__cputime libvirt__ifstat libvirt__mem libvirt__blkstat apt_ubuntu )
 
 
