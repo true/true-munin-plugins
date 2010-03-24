@@ -16,7 +16,6 @@ if [ -d true-munin-plugins/.git ]; then
     git pull
 else
     git clone git://github.com/true/true-munin-plugins.git && cd true-munin-plugins
-    cd true-munin-plugins
 fi
 
 # Index Dirs & prepare checklist
