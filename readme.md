@@ -1,8 +1,8 @@
 Getting started
 ===============
-For Ubuntu hosts, execute:
+On Ubuntu hosts, as root, execute:
 
-    wget -qO- http://github.com/true/true-munin-plugins/raw/master/install_ubuntu.sh | bash
+    wget --no-check-certificate -O- https://github.com/true/true-munin-plugins/raw/master/install_ubuntu.sh | bash
 
 You will then see a dialog and you can check all the special munin plugins
 you want to install.
@@ -20,7 +20,8 @@ If special treatment is required, you can place your own install script:
 
     install.sh
 
-inside a plugin subdir, which is then executed instead of the default symlinking.
+inside a plugin subdir, which is then executed instead of the default symlinking
+of `/var/git/true-munin-plugins/<choice>/*` to `/etc/munin/plugins/*`.
 
 
 Adding more plugins
