@@ -46,7 +46,7 @@ for plugin in ${plugins}; do
 		source install.sh
 	else
 		echo "  There was no ${plugin}/install.sh, so just symlinking all files to ${DIR_PLUGINS_USED})"
-		for plugfile in $(find ./ -maxdepth 1 -type f |egrep -v '(^\./_|^\./\.)' |sed "s#\./#$(pwd)/#g"); do
+		for plugfile in $(find ./ -maxdepth 1 -type f |egrep -v '(^\./_|^\./\.)' |sed "s#^\./#$(pwd)/#g"); do
 			plugbase=$(basename "${plugfile}")
 			ln -nfs ${plugfile} ${DIR_PLUGINS_USED}/${plugbase}
 		done
@@ -56,10 +56,8 @@ for plugin in ${plugins}; do
 	cd - > /dev/null
 done
 
-if [ -x /etc/init.d/munin-node ]; then
-	echo "Restarting munin-node... "
-	/etc/init.d/munin-node restart
-fi
+echo "Restarting munin-node... "
+restart munin-node
 
 # return to working dir
 cd ${olddir}
