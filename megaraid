@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# add:
+# nobody ALL=(ALL) NOPASSWD: /usr/bin/MegaCli64
+# to /etc/sudoers
+
+CLI="/usr/bin/MegaCli64"
+BUFFER="/tmp/megaraid-munin.tmp"
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title LSI Megaraid disk
+graph_vlabel Disks
+graph_category system
+vdrives.label Virtual disks
+degraded.label Degraded virtual didks
+degraded.critical 0:0
+offline.label Offline virtual disks
+offline.critical 0:0
+pdevs.label Total physical devices
+disks.label Total disks
+critical.label Critical disks
+critical.critical 0:0
+failed.label Failed disks
+failed.critical 0:0
+EOM
+        exit 0;;
+esac
+
+sudo $CLI -AdpAllInfo -a0 | grep -A8 "Device Present" | tail -n 7 > $BUFFER
+
+VDRIVES=`cat $BUFFER | grep "Virtual Drives" | awk {'print $4'}`
+DEGRADED=`cat $BUFFER | grep "Degraded" | awk {'print $3'}`
+OFFLINE=`cat $BUFFER | grep "Offline" | awk {'print $3'}`
+PDEVS=`cat $BUFFER | grep "Physical Devices" | awk {'print $4'}`
+DISKS=`cat $BUFFER | grep "  Disks" | awk {'print $3'}`
+CRITICAL=`cat $BUFFER | grep "  Critical Disks" | awk {'print $4'}`
+FAILED=`cat $BUFFER | grep "  Failed Disks" | awk {'print $4'}`
+
+echo "vdrives.value $VDRIVES"
+echo "degraded.value $DEGRADED"
+echo "offline.value $OFFLINE"
+echo "pdevs.value $PDEVS"
+echo "disks.value $DISKS"
+echo "critical.value $CRITICAL"
+echo "failed.value $FAILED"
+
+rm $BUFFER
