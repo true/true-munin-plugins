@@ -1,0 +1,46 @@
+#!/bin/bash
+
+MMM="/usr/sbin/mmm_control"
+BUFFER="/tmp/mmm-mysql-munin.tmp"
+
+case $1 in
+   config)
+        cat <<'EOM'
+graph_title MMM Control
+graph_vlabel Roles
+graph_category mysql2
+admin_offline.label Admin offline
+hard_offline.label Hard offline
+awaiting_recovery.label Waiting Recovery
+replication_fail.label Replication Fail
+replication_delay.label Replication Delay
+db1_online.label DB1 Online Roles
+db2_online.label DB2 Online Roles
+admin_offline.critical 0:0
+hard_offline.critical 0:0
+awaiting_recovery.critical 0:0
+replication_fail.critical 0:0
+replication_delay.critical 0:0
+EOM
+        exit 0;;
+esac
+
+sudo $MMM show > $BUFFER
+
+ADMIN_OFFLINE=`cat $BUFFER | grep ADMIN_OFFLINE | /usr/bin/wc -l`
+HARD_OFFLINE=`cat $BUFFER | grep HARD_OFFLINE | /usr/bin/wc -l`
+AWAITING_RECOVERY=`cat $BUFFER | grep AWAITING_RECOVERY | /usr/bin/wc -l`
+REPLICATION_FAIL=`cat $BUFFER | grep REPLICATION_FAIL | /usr/bin/wc -l`
+REPLICATION_DELAY=`cat $BUFFER | grep REPLICATION_DELAY | /usr/bin/wc -l`
+DB1_ONLINE=`cat $BUFFER | grep db1 | grep ONLINE | cut -d : -f 2 | tr ',' '\n' | /usr/bin/wc -l`
+DB2_ONLINE=`cat $BUFFER | grep db2 | grep ONLINE | cut -d : -f 2 | tr ',' '\n' | /usr/bin/wc -l`
+
+echo "admin_offline.value $ADMIN_OFFLINE"
+echo "hard_offline.value $HARD_OFFLINE"
+echo "awaiting_recovery.value $AWAITING_RECOVERY"
+echo "replication_fail.value $REPLICATION_FAIL"
+echo "replication_delay.value $REPLICATION_DELAY"
+echo "db1_online.value $DB1_ONLINE"
+echo "db2_online.value $DB2_ONLINE"
+
+rm $BUFFER
