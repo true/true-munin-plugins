@@ -1,5 +1,4 @@
 #!/bin/bash
-
 MMM="/usr/sbin/mmm_control"
 BUFFER="/tmp/mmm-mysql-munin.tmp"
 
