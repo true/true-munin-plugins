@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# Set the DEBUG to true if you want the
+# script to output which IPS are offline
+# Default: false
+DEBUG=0
+
+
+# Start of script:
+
+STATE=`cat /etc/keepalived/keepalived.conf  | grep -i state | awk '{print $2}'`
+
+IPS=`cat /etc/keepalived/keepalived.conf | grep -i "address" | grep -v "ipaddress" | awk '{print $2}'`
+[ ${DEBUG} -gt 0 ] && echo -e "Following IP's need to be online:\t" $IPS
+
+BINDED_IPS=`ip addr list |grep inet |cut -d' ' -f6|cut -d/ -f1`
+[ ${DEBUG} -gt 0 ] && echo -e "Following IP's are now online:\t\t" $BINDED_IPS
+
+# Usage: in_array "$needle" "${haystack[@]}"
+in_array() {
+    local hay needle=$1
+    shift
+    for hay; do
+        [[ $hay == $needle ]] && return 0
+    done
+    return 1
+}
+
+AMOUNT_IPS=0
+AMOUNT_ACTIVE_IPS=0
+for name in ${IPS[@]}
+do
+	let AMOUNT_IPS=AMOUNT_IPS+1
+	let AMOUNT_ACTIVE_IPS=AMOUNT_ACTIVE_IPS+1
+	in_array $name $BINDED_IPS
+	if [ "$?" -ne "0" ]; then
+		let AMOUNT_ACTIVE_IPS=AMOUNT_ACTIVE_IPS-1
+		[ ${DEBUG} -gt 0 ] && echo "Not online: "$name
+	fi
+done
+
+case $1 in
+    config)
+        echo 'graph_order config active'
+        echo 'graph_title Keepalived setting'
+	echo 'graph_args --base 1000 -l 0'
+        echo "graph_vlabel Active IP's ($STATE)"
+        echo 'graph_category network'
+        echo 'graph_info This graph shows the amount of active IP addresses on the server'
+        echo 'config.label Configured IP addresses'
+#        echo 'config.type COUNTER'
+        echo 'active.label Active IP addresses'
+#        echo 'active.type COUNTER'
+
+	if [ "${STATE}" = "MASTER" ]; then
+		CRITICAL=$AMOUNT_ACTIVE_IPS
+		let CRITICAL=CRITICAL-1
+		echo "active.critical " $CRITICAL":"
+	fi
+
+        exit 0
+        ;;
+esac
+
+echo "active.value $AMOUNT_ACTIVE_IPS"
+echo "config.value $AMOUNT_IPS"

@@ -1,0 +1,145 @@
+#!/usr/bin/perl
+# -*-  perl -*-
+#
+# $Id: haproxy_errors 79237 2010-01-17 01:18:14Z bvdschans $
+# Plugin to monitor haproxy error responses
+#
+# Author: Bart van der Schans <bart@vanderschans.nl>
+#
+# Parameters understood:
+#
+#       config   (required)
+#       autoconf (optional - used by munin-config)
+#       dump      dump hastats to stdout
+#
+# Configuration:
+# - Make sure the check user can read and write to the unix socket of haproxy
+# - Configure the location of the unix socket of haproxy
+# - Backends to skip (optional)
+#
+# Configuration example:
+# [haproxy*]
+# user haproxy 
+# env.socket /var/run/haproxy.sock
+# env.skip_backends stats hidden
+#
+# Magic markers:
+#%# family=auto
+#%# capabilities=autoconf
+
+use strict;
+use Munin::Plugin;
+use IO::Socket::UNIX;
+
+my $socketfile = $ENV{'socket'} || '/var/run/haproxy/haproxy.sock';
+my @skip_backends = exists $ENV{'skip_backends'} ? split(' ', $ENV{'skip_backends'}) : qw(stats public-http);
+
+# stats hash
+my %haproxy;
+
+# parse cmd line
+if ( $ARGV[0] eq "autoconf" ) {
+    print_autoconf();
+    exit 0;
+} elsif ( $ARGV[0] eq "config" ) {
+    print_config();
+    exit 0;
+} elsif ( $ARGV[0] eq "dump" ) {
+    dump_stats();
+    exit 1;
+} else {
+    print_values();
+    exit 0;
+}
+
+sub print_values() {
+    read_stats();
+    for my $pxname (sort keys %haproxy) {
+        next if (grep {m|^$pxname?$|} @skip_backends); 
+        my $field = clean_fieldname($pxname);
+        print "$field.value " . $haproxy{$pxname}{"BACKEND"}{"hrsp_5xx"} . "\n";
+    }
+}
+
+sub print_config() {
+    read_stats();
+    print "graph_title errors per backend\n";
+    print "graph_args --base 1000\n";
+    print "graph_vlabel errors per \${graph_period}\n";
+    print "graph_category haproxy\n";
+    print "graph_info errors, responses with a 5xx status code, per haproxy backend. This is the sum of the individual backend servers.\n";
+    for my $pxname (sort keys %haproxy) {
+        next if (grep {m|^$pxname?$|} @skip_backends); 
+        my $field = clean_fieldname($pxname);
+        print "$field.label $pxname\n";
+        print "$field.info number of error responses (5xx) per \${graph_period} per backend.\n";
+        print "$field.type DERIVE\n";
+        print "$field.min 0\n";
+    }
+}
+
+sub print_autoconf() {
+    if (`/usr/bin/perl $0` eq "" ) {
+        print "no\n";
+        exit 1;
+    } else {
+        if ( -S $socketfile ) {
+            print "yes\n";
+            exit 0;
+        } else {
+            print "no\n";
+            exit 1;
+        }
+    }
+}
+
+sub dump_stats() {
+    read_stats();
+    foreach my $pxname (sort keys %haproxy) {
+        my @svnames = sort keys %{ $haproxy{$pxname} };
+        foreach my $svname (@svnames) {
+            my %stats = %{ $haproxy{$pxname}{$svname} };
+            for my $field (sort keys %stats) {
+                print $pxname . "." . $svname . "." . $field . "=" . $stats{$field} .  "\n" if $field;
+            }
+        }
+        print "\n";
+    }
+}
+
+sub read_stats() {
+    unless ( -S $socketfile ) {
+        die "Socket not found: $socketfile"
+    }
+    my $socket = IO::Socket::UNIX->new(Peer  => $socketfile,
+                                   Type      => SOCK_STREAM ) or die $!;
+    print $socket "show stat\n";
+    my @headers;
+    while (<$socket>) {
+        # skip empty lines
+        next if /^\s*$/;
+ 
+        # find headers
+        if ( /^\# (.+)/ ) {
+            @headers = split(",", $1);
+        } else { 
+            # build stats hash
+            my $i = 0;
+            my %stats;
+            my @values = split(",");
+            my $pxname = @values[0];
+            my $svname = @values[1];
+            foreach my $value (@values) {
+                $stats{@headers[$i]} = $value;
+                $i++;
+            }
+            %{ $haproxy{$pxname}{$svname} } = %stats;
+        }
+    }
+    # cleanup
+    $socket->flush;
+    $socket->close;
+}
+
+# should not be reached
+exit -1;
