@@ -50,7 +50,7 @@ my %plugins = (
     },
     'elasticsearch_jvm_memory' => {
         'path_all' => '/_cluster/nodes/stats',
-        'path' => '/_nodes/'.$HOST.'/jvm/stats',
+        'path' => '/_nodes/jvm/stats',
         'graph' => {
             'graph_title' => 'ElasticSearch jvm memory',
         },
@@ -63,7 +63,7 @@ my %plugins = (
     },
     'elasticsearch_jvm_pool_memory' => {
         'path_all' => '/_cluster/nodes/stats',
-        'path' => '/_nodes/'.$HOST.'/jvm/stats',
+        'path' => '/_nodes/jvm/stats',
         'graph' => {
             'graph_title' => 'ElasticSearch jvm pool memory',
         },
@@ -76,7 +76,7 @@ my %plugins = (
     },
     'elasticsearch_jvm_threads' => {
         'path_all' => '/_cluster/nodes/stats',
-        'path' => '/_nodes/'.$HOST.'/jvm/stats',
+        'path' => '/_nodes/jvm/stats',
         'graph' => {
             'graph_args' => '--base 1000',
             'graph_title' => 'ElasticSearch jvm threads',
