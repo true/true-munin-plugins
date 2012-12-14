@@ -10,7 +10,7 @@ DEBUG=0
 
 STATE=`cat /etc/keepalived/keepalived.conf  | grep -i state | awk '{print $2}'`
 
-IPS=`cat /etc/keepalived/keepalived.conf | grep -i "address" | grep -v "ipaddress" | awk '{print $2}'`
+IPS=`cat /etc/keepalived/keepalived.conf | sed -n "/virtual_ipaddress/{:a;n;/}/b;p;ba}" | sed "s/address//g" | awk '{print $1}' | cut -d"/" -f1 | grep -v '^$'`
 [ ${DEBUG} -gt 0 ] && echo -e "Following IP's need to be online:\t" $IPS
 
 BINDED_IPS=`ip addr list |grep inet |cut -d' ' -f6|cut -d/ -f1`
