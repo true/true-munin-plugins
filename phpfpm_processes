@@ -5,6 +5,9 @@
 #
 # Copyright TJ Stein 2010 http://constantshift.com
 #
+# Modified by Leander / True:
+# 18-01-2013 Removed hard-coded PHP-FPM daemon and made it Ubuntu Lucid / Precise compatible
+#
 # Parameters:
 #
 # config (required)
@@ -14,8 +17,6 @@
 # scripts):
 #%# family=manual
 #%# capabilities=autoconf
-
-PHP_BIN=${phpbin-"php5-fpm"}
 
 if [ "$1" = "autoconf" ]; then
 echo yes
@@ -35,4 +36,4 @@ exit 0
 fi
 
 echo -n "php_processes.value "
-ps awwwux | grep $PHP_BIN | grep -v grep | wc -l
+ps awwwux | egrep "[p]hp5-fpm|[p]hp-fpm" | wc -l
