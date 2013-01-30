@@ -1,0 +1,250 @@
+--- ../weeereenanderev3_ookkk	2013-01-25 14:43:23.513399094 +0100
++++ ksecure_backup.bash	2013-01-30 10:51:15.913451744 +0100
+@@ -15,6 +15,25 @@
+ #*  - separate config file
+ #*  - automatic upgrades of the script
+ #*
++#* Updates:
++#*  - 25-01-2013 0.827 Fixed ignoring exit codes in pipes and not even
++#*                     catching it due to not checking the exit code
++#*                     directly after execution of program.
++#*  - 28-01-2013 0.828 Added the mysqldump -B parameter globally to
++#*                     avoid mistakes and inconsistancy.
++#*                     Also added --skip-lock-tables for the special
++#*                     tables in mysqldump as information_schema and
++#*                     performance_schema. This would avoid unnecessary
++#*                     MySQL dump errors.
++#*  - 30-01-2013 0.829 Changed the --all option in mysqldump as it is
++#*                     deprecated in favor of --create-options as of
++#*                     MySQL 4.1.2. This should make the script Ubuntu
++#*                     Presice compatible too.
++#*                     Merged two versions of this script into one by
++#*                     adding the option to modify/add the variable
++#*                     FS_NEEDFREESPACE=2000000 to the configuration
++#*                     file. Default is 3000000. (Yes, its not 1024)
++#*
+ #*** Example:
+ #**  Usage
+ #* ./ksecure_backup.bash
+@@ -23,10 +42,12 @@
+ #*
+ #*** Info:
+ #*  @author      Kevin van Zonneveld <kevin@vanzonneveld.net>
+-#*  @version     0.826
++#*  @version     0.828
+ #*  @link        http://kevin.vanzonneveld.net
+ #*/
+ 
++#set -e <-- Will quit on the first exit code != 0 :-)
++set -o pipefail
+ 
+ ##########################################################################
+ # intialize                                                              #
+@@ -34,6 +55,7 @@
+ 
+ PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/X11:/root/bin"
+ RUN_WARNINGS=0
++: ${FS_NEEDFREESPACE:="3000000"}	# Implement backwards compatibility
+ 
+ 
+ ##########################################################################
+@@ -852,9 +874,9 @@
+ 	fi
+ fi
+ 
+-if [ $(${CMD_DF} -kP ${FS_DESTINDIR} | ${CMD_GAWK} '{print $4}' | $CMD_GREP '[0-9]') -lt 3000000 ]; then
++if [ $(${CMD_DF} -kP ${FS_DESTINDIR} | ${CMD_GAWK} '{print $4}' | $CMD_GREP '[0-9]') -lt $FS_NEEDFREESPACE ]; then
+     # backup storage directory does not contain enough free space
+-    logit "fatal: ${FS_DESTINDIR} does not contain enough free space, I need at least 3GB to store temporary files"
++    logit "fatal: ${FS_DESTINDIR} does not contain enough free space, I need at least $((FS_NEEDFREESPACE/1000/1000))GB to store temporary files"
+ fi
+ 
+ # DB CHECKS
+@@ -897,6 +919,7 @@
+ # FS BACKUP
+ logit "debug: commencing FS Backup"
+ for FS_SOUREDIR in ${FS_SOUREDIRS}; do
++	ERRORCODE_SAFE=0
+ 	if [ ! -d "${FS_SOUREDIR}" ];then
+ 		logit "critical: trying to create an FS backup of ${FS_SOUREDIR} but it does not exist, more details in ${LOG_FILE}"
+ 	else
+@@ -910,15 +933,17 @@
+ 			# encrypt. do not use incremental in case of encryption
+ 			logit "info: backing up and encrypting directory ${FS_SOUREDIR} (${FS_SOURCESIZE}) to ${ENCR}"
+                  ${CMD_TAR} ${TAR_EXCLUDE_X_TAR} -pc${GZIP_ENABLED_X_TAR} ${FS_SOUREDIR} 2>>${LOG_FILE} | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}
++			[ $? -ne 0 ] && ERRORCODE_SAFE=1
+             CMD="${CMD_TAR} ${TAR_EXCLUDE_X_TAR} -pc${GZIP_ENABLED_X_TAR} ${FS_SOUREDIR} 2>>${LOG_FILE} | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}"
+         else
+ 			#normal tar+gzip
+ 			logit "info: backing up directory ${FS_SOUREDIR} (${FS_SOURCESIZE}) to ${DEST}"
+                  ${CMD_TAR} ${TAR_EXCLUDE_X_TAR} -pc${GZIP_ENABLED_X_TAR}f ${DEST} --listed-incremental=${SNAR} ${FS_SOUREDIR} 1>/dev/null 2>>${LOG_FILE}
++			[ $? -ne 0 ] && ERRORCODE_SAFE=1
+ 			CMD="${CMD_TAR} ${TAR_EXCLUDE_X_TAR} -pc${GZIP_ENABLED_X_TAR}f ${DEST} --listed-incremental=${SNAR} ${FS_SOUREDIR} 1>/dev/null 2>>${LOG_FILE}"
+ 		fi
+ 
+-		if [ $? -ne 0 ]; then
++		if [[ $ERRORCODE_SAFE -ne 0 ]]; then
+ 			logit "critical: FS backup of ${FS_SOUREDIR} (${FS_SOURCESIZE}) returned errors (${CMD}), more details in ${LOG_FILE}"
+ 		else
+ 			logit "debug: (${CMD}) finished without errors"
+@@ -931,6 +956,7 @@
+ 	logit "debug: commencing SY Backup"
+ 	# dpkg get-selections
+ 	if [ -n "${CMD_DPKG}" ];then
++		ERRORCODE_SAFE=0
+ 		DEST="${FS_DESTINDIR}/${DATESTR}-SY-dpkg-selection.txt.bz2"
+ 		ENCR="${FS_DESTINDIR}/${DATESTR}-SY-dpkg-selection.txt.bz2.enc"
+ 
+@@ -938,15 +964,17 @@
+ 			# encrypt.
+ 			logit "info: backing up and encrypting dpkg-selection to ${ENCR}"
+                  ${CMD_DPKG} --get-selections | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}
++			[ $? -ne 0 ] && ERRORCODE_SAFE=1
+ 			CMD="${CMD_DPKG} --get-selections | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}"
+ 		else
+ 			#normal bzip2
+ 			logit "info: backing up dpkg-selection to ${DEST}"
+                  ${CMD_DPKG} --get-selections | ${CMD_BZIP2} -qzc1 >${DEST}
++			[ $? -ne 0 ] && ERRORCODE_SAFE=1
+ 			CMD="${CMD_DPKG} --get-selections | ${CMD_BZIP2} -qzc1 >${DEST}"
+ 		fi
+ 
+-		if [ $? -ne 0 ]; then
++		if [[ $ERRORCODE_SAFE -ne 0 ]]; then
+ 			logit "critical: SY dpkg backup failed (${CMD}), more details in ${LOG_FILE}"
+         else
+             logit "debug: (${CMD}) finished without errors"
+@@ -955,21 +983,24 @@
+ 
+ 	# installed pear packages
+ 	if [ -n "${CMD_PEAR}" ]; then
++		ERRORCODE_SAFE=0
+ 		DEST="${FS_DESTINDIR}/${DATESTR}-SY-pear-list.txt.bz2"
+ 		ENCR="${FS_DESTINDIR}/${DATESTR}-SY-pear-list.txt.bz2.enc"
+ 		if [ "${ENCRYPTION_ENABLED}" == 1 ]; then
+ 			# encrypt.
+ 			logit "info: backing up and encrypting pear-list to ${ENCR}"
+                  ${CMD_PEAR} list | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}
++			[ $? -ne 0 ] && ERRORCODE_SAFE=1
+ 			CMD="${CMD_PEAR} list | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}"
+ 		else
+ 			#normal bzip2
+ 			logit "info: backing up pear-list to ${DEST}"
+                  ${CMD_PEAR} list | ${CMD_BZIP2} -qzc1 >${DEST}
++			[ $? -ne 0 ] && ERRORCODE_SAFE=1
+ 			CMD="${CMD_PEAR} list | ${CMD_BZIP2} -qzc1 >${DEST}"
+ 		fi
+ 
+-		if [ $? -ne 0 ]; then
++		if [[ $ERRORCODE_SAFE -ne 0 ]]; then
+ 			logit "warning: SY pear backup failed (${CMD}), more details in ${LOG_FILE}"
+         else
+             logit "debug: (${CMD}) finished without errors"
+@@ -978,21 +1009,24 @@
+ 
+     # installed crontab packages
+     if [ -n "${CMD_CRONTAB}" ]; then
++	ERRORCODE_SAFE=0
+         DEST="${FS_DESTINDIR}/${DATESTR}-SY-crontab-list.txt.bz2"
+         ENCR="${FS_DESTINDIR}/${DATESTR}-SY-crontab-list.txt.bz2.enc"
+         if [ "${ENCRYPTION_ENABLED}" == 1 ]; then
+             # encrypt.
+             logit "info: backing up and encrypting crontab-list to ${ENCR}"
+                  ${CMD_CRONTAB} -l | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}
++		[ $? -ne 0 ] && ERRORCODE_SAFE=1
+             CMD="${CMD_CRONTAB} -l | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}"
+         else
+             #normal bzip2
+             logit "info: backing up crontab-list to ${DEST}"
+                  ${CMD_CRONTAB} -l | ${CMD_BZIP2} -qzc1 >${DEST}
++		[ $? -ne 0 ] && ERRORCODE_SAFE=1
+             CMD="${CMD_CRONTAB} -l | ${CMD_BZIP2} -qzc1 >${DEST}"
+         fi
+ 
+-        if [ $? -ne 0 ]; then
++	if [[ $ERRORCODE_SAFE -ne 0 ]]; then
+             logit "warning: SY crontab backup failed (${CMD}), more details in ${LOG_FILE}"
+         else
+             logit "debug: (${CMD}) finished without errors"
+@@ -1007,22 +1041,36 @@
+ 	if [ -n "${CMD_MYSQL}" ] && [ -f "${CMD_MYSQL}" ] && [ -x "${CMD_MYSQL}" ];then
+ 		DATABASES=`echo "SHOW DATABASES;" | ${CMD_MYSQL} -p${DB_PASS} -u ${DB_USER} -h ${DB_HOST}`
+ 		for DATABASE in $DATABASES; do
++			ERRORCODE_SAFE=0
++			if [ "${DATABASE}" == "information_schema" -o "${DATABASE}" == "performance_schema" ]; then
++				EXTRA_DUMP_OPTION="--skip-lock-tables"
++			else
++				EXTRA_DUMP_OPTION=""
++			fi
++
+ 			if [ "${DATABASE}" != "Database" ]; then
+ 				DEST="${FS_DESTINDIR}/${DATESTR}-DB-${DATABASE}.sql.bz2"
+ 				ENCR="${FS_DESTINDIR}/${DATESTR}-DB-${DATABASE}.sql.bz2.enc"
+ 				if [ "${ENCRYPTION_ENABLED}" == 1 ]; then
+ 					# encrypt.
+ 					logit "info: backing up (${CMD_MYSQL}) and encrypting database ${DATABASE} to ${DEST}"
+-                         ${CMD_MYSQLDUMP} -Q --all --complete-insert --quote-names --add-drop-table -p${DB_PASS} -u${DB_USER} -h${DB_HOST} ${DATABASE} 2>>${LOG_FILE} | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}
+-					CMD="${CMD_MYSQLDUMP} -Q --all --complete-insert --quote-names --add-drop-table -p${DB_PASS} -u${DB_USER} -h${DB_HOST} ${DATABASE} 2>>${LOG_FILE} | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}"
++                         ${CMD_MYSQLDUMP} -Q -B --create-options --complete-insert --quote-names --add-drop-table ${EXTRA_DUMP_OPTION} -p${DB_PASS} -u${DB_USER} -h${DB_HOST} ${DATABASE} 2>>${LOG_FILE} | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}
++
++					[ $? -ne 0 ] && ERRORCODE_SAFE=1
++
++					CMD="${CMD_MYSQLDUMP} -Q -B --create-options --complete-insert --quote-names --add-drop-table ${EXTRA_DUMP_OPTION} -p${DB_PASS} -u${DB_USER} -h${DB_HOST} ${DATABASE} 2>>${LOG_FILE} | ${CMD_BZIP2} -qzc1 | ${CMD_OPENSSL} enc -aes-256-cbc -salt -k ${ENCRYPTION_PASS} -out ${ENCR}"
+ 				else
+ 					# normal bzip2
+ 					logit "info: backing up (${CMD_MYSQL}) database ${DATABASE} to ${DEST}"
+-                         ${CMD_MYSQLDUMP} -Q --all --complete-insert --quote-names --add-drop-table -p${DB_PASS} -u${DB_USER} -h${DB_HOST} ${DATABASE} 2>>${LOG_FILE} | ${CMD_BZIP2} -qzc1 >${DEST}
+-					CMD="${CMD_MYSQLDUMP} -Q --all --complete-insert --quote-names --add-drop-table -p${DB_PASS} -u${DB_USER} -h${DB_HOST} ${DATABASE} 2>>${LOG_FILE} | ${CMD_BZIP2} -qzc1 >${DEST}"
++                         ${CMD_MYSQLDUMP} -Q -B --create-options --complete-insert --quote-names --add-drop-table ${EXTRA_DUMP_OPTION} -p${DB_PASS} -u${DB_USER} -h${DB_HOST} ${DATABASE} 2>>${LOG_FILE} | ${CMD_BZIP2} -qzc1 >${DEST}
++
++					[ $? -ne 0 ] && ERRORCODE_SAFE=1
++
++					CMD="${CMD_MYSQLDUMP} -Q -B --create-options --complete-insert --quote-names --add-drop-table ${EXTRA_DUMP_OPTION} -p${DB_PASS} -u${DB_USER} -h${DB_HOST} ${DATABASE} 2>>${LOG_FILE} | ${CMD_BZIP2} -qzc1 >${DEST}"
+ 				fi
+ 
+-				if [ $? -ne 0 ]; then
++				if [[ $ERRORCODE_SAFE -ne 0 ]]; then
++					logit "debug: (${CMD}) <-- Failing command"
+ 					logit "critical: DB backup of ${DATABASE} returned errors, more details in ${LOG_FILE}"
+                 else
+                     logit "debug: (${CMD}) finished without errors"
+@@ -1036,6 +1084,7 @@
+ 
+ # FTP BACKUP
+ if [ "${FTP_ENABLED}" == 1 ]; then
++	ERRORCODE_SAFE=0
+ 	logit "debug: commencing FTP Upload"
+ 	# ftp upload
+ 	if [ -n "${CMD_FTPUPLOAD}" ] && [ -f "${CMD_FTPUPLOAD}" ] && [ -x "${CMD_FTPUPLOAD}" ];then
+@@ -1046,9 +1095,10 @@
+             logit "critical: another ftp-upload with pid ${running_pid} is already running"
+         else
+                  ${CMD_FTPUPLOAD} -h ${FTP_HOST} -u ${FTP_USER} --password ${FTP_PASS} -b -d ${FTP_CDIR} ${FS_DESTINDIR}/* 1>/dev/null 2>>${LOG_FILE}
++		[ $? -ne 0 ] && ERRORCODE_SAFE=1
+             CMD="${CMD_FTPUPLOAD} -h ${FTP_HOST} -u ${FTP_USER} --password ${FTP_PASS} -b -d ${FTP_CDIR} ${FS_DESTINDIR}/* 1>/dev/null 2>>${LOG_FILE}"
+ 
+-            if [ $? -ne 0 ]; then
++            if [[ $ERRORCODE_SAFE -ne 0 ]]; then
+                 logit "critical: FTP upload returned errors, more details in ${LOG_FILE}"
+             else
+                 logit "debug: (${CMD}) finished without errors"
+@@ -1069,6 +1119,7 @@
+ 
+ # RSYNC BACKUP
+ if [ "${RSYNC_ENABLED}" == 1 ]; then
++	ERRORCODE_SAFE=0
+ 	logit "debug: commencing RSYNC Upload"
+ 	# rsync upload
+ 	if [ -n "${CMD_RSYNC}" ] && [ -f "${CMD_RSYNC}" ] && [ -x "${CMD_RSYNC}" ];then
+@@ -1079,9 +1130,10 @@
+             logit "critical: another rsync with pid ${running_pid} is already running"
+         else
+                  ${CMD_RSYNC} -raz ${FS_DESTINDIR}/* ${RSYNC_USER}@${RSYNC_HOST}:${RSYNC_CDIR}/  1>/dev/null 2>>${LOG_FILE}
++		[ $? -ne 0 ] && ERRORCODE_SAFE=1
+             CMD="${CMD_RSYNC} -raz ${FS_DESTINDIR}/* ${RSYNC_USER}@${RSYNC_HOST}:${RSYNC_CDIR}/  1>/dev/null 2>>${LOG_FILE}"
+ 
+-            if [ $? -ne 0 ]; then
++            if [[ $ERRORCODE_SAFE -ne 0 ]]; then
+                 logit "critical: RSYNC upload returned errors, more details in ${LOG_FILE}"
+             else
+                 logit "debug: (${CMD}) finished without errors"
