@@ -5,6 +5,8 @@ use LWP;
 use JSON qw/decode_json/;
 
 my $HOST = exists $ENV{'host'} ? $ENV{'host'} : "127.0.0.1";
+my $PORT = exists($ENV{'PORT'}) ? $ENV{'PORT'} : 9200;
+my $GRAPH_ALL_NODES = exists($ENV{'GRAPH_ALL_NODES'}) ? $ENV{'GRAPH_ALL_NODES'} : 0;
 
 # default graph params
 my %graph_default = (
@@ -50,7 +52,7 @@ my %plugins = (
     },
     'elasticsearch_jvm_memory' => {
         'path_all' => '/_cluster/nodes/stats',
-        'path' => '/_nodes/jvm/stats',
+        'path' => '/_nodes/_local/jvm/stats',
         'graph' => {
             'graph_title' => 'ElasticSearch jvm memory',
         },
@@ -63,7 +65,7 @@ my %plugins = (
     },
     'elasticsearch_jvm_pool_memory' => {
         'path_all' => '/_cluster/nodes/stats',
-        'path' => '/_nodes/jvm/stats',
+        'path' => '/_nodes/_local/jvm/stats',
         'graph' => {
             'graph_title' => 'ElasticSearch jvm pool memory',
         },
@@ -76,7 +78,7 @@ my %plugins = (
     },
     'elasticsearch_jvm_threads' => {
         'path_all' => '/_cluster/nodes/stats',
-        'path' => '/_nodes/jvm/stats',
+        'path' => '/_nodes/_local/jvm/stats',
         'graph' => {
             'graph_args' => '--base 1000',
             'graph_title' => 'ElasticSearch jvm threads',
@@ -97,10 +99,10 @@ if (! defined($plugin)) {
 }
 
 # mix-in run-time settings
-$plugin->{host} = exists($ENV{'HOST'}) ? $ENV{'HOST'} : '127.0.0.1';
-$plugin->{port} = exists($ENV{'PORT'}) ? $ENV{'PORT'} : 9200;
+$plugin->{host} = $HOST;
+$plugin->{port} = $PORT;
 # this determines whether we chart just for the local node or whether we chart all nodes in the cluster (default: local only)
-$plugin->{graph_all} = exists($ENV{'GRAPH_ALL_NODES'}) ? $ENV{'GRAPH_ALL_NODES'} : 0;
+$plugin->{graph_all} = $GRAPH_ALL_NODES;
 
 # user agent
 my $ua = LWP::UserAgent->new;
