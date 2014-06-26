@@ -28,7 +28,7 @@ EOM
         exit 0;;
 esac
 
-sudo $CLI -NoLog -AdpAllInfo -a0 | grep -A8 "Device Present" | tail -n 7 > $BUFFER
+sudo $CLI -AdpAllInfo -a0 -NoLog | grep -A8 "Device Present" | tail -n 7 > $BUFFER
 
 VDRIVES=`cat $BUFFER | grep "Virtual Drives" | awk {'print $4'}`
 DEGRADED=`cat $BUFFER | grep "Degraded" | awk {'print $3'}`
