@@ -95,14 +95,22 @@ def config():
     sys.exit(0)
 
 def check_origin(pkg):
-    #print 'Checking: %s (%s)' % (pkg.name, map(str, pkg.candidateOrigin))
-    if pkg.candidateOrigin:
-        for archive in archives:
-            for origin in pkg.candidateOrigin:
-                #a = origin.archive.rpartition('-')[2]
-                a = origin.archive.split('-')[origin.archive.count('-')]
-                if a == archive and origin.origin in origins:
-                    return a
+    try:
+        if pkg.installed.origins:
+            for archive in archives:
+                for origin in pkg.installed.origins:
+                    a = origin.archive.split('-')[origin.archive.count('-')]
+                    if a == archive and origin.origin in origins:
+                        return a
+
+    except NameError:
+        if pkg.candidateOrigin:
+            for archive in archives:
+                for origin in pkg.candidateOrigin:
+                    a = origin.archive.split('-')[origin.archive.count('-')]
+                    if a == archive and origin.origin in origins:
+                        return a
+
     return other
 
 if len(sys.argv) > 1:
