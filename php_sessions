@@ -5,7 +5,7 @@
 #
 # Abstract
 # ~~~~~~~~
-# munin plugin that logs active apache sessions
+# munin plugin that logs active PHP sessions
 #
 # Authors
 # ~~~~~~~
@@ -55,7 +55,7 @@ fi
 
 if [ "$1" = "config" ]; then
         echo 'graph_title PHP Sessions'
-        echo 'graph_info This graph shows active Apache/PHP sessions.'
+        echo 'graph_info This graph shows active PHP sessions.'
         echo 'graph_category PHP'
         echo "graph_args --lower-limit 0"
         echo 'graph_vlabel n'
