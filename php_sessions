@@ -23,6 +23,8 @@
 #
 # Changes
 # ~~~~~~~
+# 2014-09-16, leander: modified sessiondir to match latest Ubuntu and
+#                      changed group to PHP.
 # 2012-07-31, leander: modified sessiondir to match Debian standards
 # 2011-02-13, subpardaemon: add env.sessiondir, make sure find uses
 #                           the given path (it hadn't before)
@@ -38,7 +40,7 @@
 #%# family=auto
 #%# capabilities=autoconf
 
-SESSDIR=${sessiondir:-"/var/lib/php/session"}
+SESSDIR=${sessiondir:-"/var/lib/php5"}
 
 if [ "$1" = "autoconf" ]; then
     test -d "$SESSDIR" > /dev/null 2>&1
@@ -52,9 +54,9 @@ if [ "$1" = "autoconf" ]; then
 fi
 
 if [ "$1" = "config" ]; then
-        echo 'graph_title Apache/PHP Sessions'
+        echo 'graph_title PHP Sessions'
         echo 'graph_info This graph shows active Apache/PHP sessions.'
-        echo 'graph_category apache'
+        echo 'graph_category PHP'
         echo "graph_args --lower-limit 0"
         echo 'graph_vlabel n'
 
