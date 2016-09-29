@@ -3,6 +3,8 @@
 # Set the DEBUG to true if you want the
 # script to output which IPS are offline
 # Default: false
+#%# family=auto
+#%# capabilities=autoconf
 DEBUG=0
 
 if [ "$1" == "autoconf" ]; then
