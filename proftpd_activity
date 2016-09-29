@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# Munin-plugin to monitor the proftpd activity.
+#
+# Parameters understood:
+#
+#	config		(required)
+#	autoconf	(optional - used by munin-config)
+#
+# GNU GPL, Olivier Thauvin
+# - Updated by True to fix ftpwho missing formatting and defaulting AWK variables
+#
+# Magick markers (optional - used by munin-config and som installation
+# scripts):
+#
+#%# family=auto
+#%# capabilities=autoconf
+
+if [ "$1" = "autoconf" ]; then
+	ftpwho >/dev/null 2>&1
+	if [ $? == 0 ]; then
+		echo yes
+		exit 0
+	else
+		echo no
+		exit 1
+	fi
+fi
+
+if [ "$1" = "config" ]; then
+    echo 'graph_title Proftpd activity'
+    echo 'graph_order ret list idle others'
+    echo 'graph_category ftp'
+    echo 'graph_info This graph show proftpd activity'
+    echo 'graph_args --base 1000 -l 0'
+    echo 'graph_total total'
+    echo 'ret.label download'
+    echo 'ret.draw STACK'
+    echo 'ret.info Number of download'
+    echo 'list.label ls'
+    echo 'list.draw AREA'
+    echo 'list.info Number of ls process'
+    echo 'idle.label idle'
+    echo 'idle.draw STACK'
+    echo 'idle.info Number of idle connection'
+    echo 'others.label other'
+    echo 'others.draw STACK'
+    echo 'others.info Number of others actions'
+    exit 0
+fi
+
+ftpwho -o oneline | egrep -v "^Service|^standalone|^no users" |\
+sed 's/^.\{39\}//' |\
+awk 'BEGIN {RET=0;IDLE=0;LIST=0;OTHER=0;}{
+	if ($1 == "RETR") RET++;
+	else if ($1 == "idle") IDLE++;
+	else if ($1 == "LIST") LIST++;
+	else if($1) OTHER++
+} END {
+	print "ret.value "RET"\nidle.value "IDLE"\nothers.value "OTHER"\nlist.value "LIST
+}'
