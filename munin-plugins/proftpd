@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+# -*- perl -*-
+# 
+# 2016-09-29 RU: First post!
+#			stolen from http://munin-monitoring.org/browser/munin-contrib/plugins/ftp/proftpd
+#			added autoconf, magic markers
+  
+=head1 MAGIC MARKERS
+
+ #%# family=auto
+ #%# capabilities=autoconf
+
+=cut
+
+$proftpd_log = "/var/log/proftpd/proftpd.log";
+
+if (($ARGV[0] and $ARGV[0] eq "autoconf") && -e $proftpd_log)
+{
+ print "yes\n";
+ exit 0;
+}
+
+if ($ARGV[0] and $ARGV[0] eq "config")
+{
+ print "graph_args --base 1000 -l 0\n";
+ print "graph_title ProFTPd\n";
+ print "graph_category Ftp\n";
+ print "graph_vlabel Stats Proftpd\n";
+ print "succes.label Login succes\n";
+ print "succes.draw AREA\n";
+ print "failed.label Login failed\n";
+ print "failed.draw AREA\n";
+ exit 0;
+}
+
+$succes = `grep -c "successful" $proftpd_log`;
+$failed = `grep -c "Login failed" $proftpd_log`;
+
+print "succes.value $succes";
+print "failed.value $failed";
