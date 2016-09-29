@@ -5,6 +5,15 @@
 # Default: false
 DEBUG=0
 
+if [ "$1" == "autoconf" ]; then
+ if  [ -f /etc/keepalived/keepalived.conf ]; then
+  echo yes
+  exit 0
+ else
+  echo no
+  exit 0
+ fi
+fi
 
 # Start of script:
 
