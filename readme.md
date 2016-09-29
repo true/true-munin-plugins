@@ -16,11 +16,3 @@ Automatic plugin detection
 ==========================
 
 In an effort to be able to just place all plugins and use munin's autoconf option to sort out if it needs to be enabled or not, I (ron) have made directories plugin-conf.d and munin-plugins. All plugins need to be tested if autoconf works, and if so moved to munin-plugins (and an entry in plugin-conf.d if needed). I don't think install_ubuntu.sh has been used in the past years, mostly plugins were pulled when needed, as is descibed in wiki pages per service.
-
-Adding more plugins
-===================
-The install script automatically iterates over newly added dirs & files, so
-it should not be modified for the purpose of adding new plugins.
-Just drop them in this repo.
-
-Or mail me if it's too much hassle for you
