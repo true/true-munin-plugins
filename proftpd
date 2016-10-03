@@ -14,11 +14,17 @@
 
 $proftpd_log = "/var/log/proftpd/proftpd.log";
 
-if (($ARGV[0] and $ARGV[0] eq "autoconf") && -e $proftpd_log)
+if ($ARGV[0] and $ARGV[0] eq "autoconf" and -e $proftpd_log)
 {
  print "yes\n";
  exit 0;
 }
+elsif ($ARGV[0] and $ARGV[0] eq "autoconf" and !-e $proftpd_log)
+{
+ print "no\n";
+ exit 0;
+}
+
 
 if ($ARGV[0] and $ARGV[0] eq "config")
 {
